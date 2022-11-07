@@ -2,6 +2,8 @@
 
 # dependencies
 /node_modules
+/nfts
+/orbitdb
 /.pnp
 .pnp.js
 
