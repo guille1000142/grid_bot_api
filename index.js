@@ -6,15 +6,51 @@ import axios from "axios";
 import { create } from "ipfs";
 import OrbitDB from "orbit-db";
 import cors from "cors";
+import { createVerifier } from "fast-jwt";
+import Web3 from "web3";
 
 dotenv.config({ silent: process.env.NODE_ENV === "production" });
 const app = express();
 
-app.use(
-  cors({
-    origin: process.env.ORIGIN,
-  })
+app.use(cors());
+
+const web3 = new Web3(
+  new Web3.providers.WebsocketProvider(process.env.QUICKNODE_RPC)
 );
+
+function authenticateToken(req, res, next) {
+  const wallet = req.query.wallet;
+  const authHeader = req.headers["authorization"];
+  const token = authHeader && authHeader.split(" ")[1];
+
+  if (token === null || token === undefined) return res.sendStatus(401);
+
+  const verify = createVerifier({
+    key: async () => process.env.TOKEN_SECRET,
+  });
+  return verify(token)
+    .then((value) => {
+      if (wallet === undefined) {
+        return next();
+      } else {
+        const message = "CHAINLINK HACKATHON 2022 | Welcome to grid bot";
+        const walletSignature = web3.eth.accounts.recover(
+          message,
+          value.signature
+        );
+
+        if (wallet !== walletSignature.toLocaleLowerCase()) {
+          return res.sendStatus(403);
+        } else {
+          return next();
+        }
+      }
+    })
+    .catch((err) => {
+      console.log(err);
+      return res.sendStatus(403);
+    });
+}
 
 let docstore;
 
@@ -37,54 +73,55 @@ const createInstance = async () => {
 
 createInstance();
 
-app.get("/", (req, res) => {
-  res.send("<h1>Grid Bot</h1>");
-});
-
-app.get("/api/v1/nft/create", async (req, res) => {
+app.get("/api/v1/nft/create", authenticateToken, (req, res) => {
   // REQUEST QUERIES
   const cid = req.query.cid;
   const wallet = [req.query.wallet];
+
+  if (!docstore || wallet[0] === null || cid === null)
+    return res.status(400).end();
+
   let likes;
 
-  if (docstore) {
-    // CHECK IF DOC EXIST
-    const info = docstore.get(cid);
-    if (info.length > 0) {
-      // UPDATE CHANGES
-      // CHECK IF WALLET HAS GIVEN A LIKE
-      const isWallet = info.wallets.find(({ user }) => user === wallet[0]);
-      if (isWallet !== undefined) {
-        // REMOVE LIKE
-        const index = info.wallets.indexOf(wallet[0]);
-        likes = {
-          value: info.likes.value - 1,
-          wallets: arreglo.splice(index, 1),
-        };
-      } else {
-        // ADD LIKE
-        likes = {
-          value: info.likes.value + 1,
-          wallets: info.wallets.concat(wallet),
-        };
-        docstore.put({ _id: cid, likes }).then(() => res.status(202).end());
-      }
-    } else {
-      // CREATE DOC
-      likes = {
-        value: 0,
-        wallets: [],
-      };
-    }
+  // CHECK IF DOC EXISTS
+  const info = docstore.get(cid);
 
-    // UPDATE CHANGES IN DOC
-    docstore.put({ _id: cid, likes }).then(() => res.status(202).end());
+  if (info.length > 0) {
+    const { value, wallets } = info[0].likes;
+    // UPDATE CHANGES
+
+    // CHECK IF WALLET HAS GIVEN A LIKE
+    const isWallet = wallets.find((user) => user === wallet[0]);
+    if (isWallet !== undefined) {
+      // REMOVE LIKE
+      const index = wallets.indexOf(wallet[0]);
+      wallets.splice(index, 1);
+      likes = {
+        value: value - 1,
+        wallets: wallets,
+      };
+    } else {
+      // ADD LIKE
+      likes = {
+        value: value + 1,
+        wallets: wallets.concat(wallet),
+      };
+      docstore.put({ _id: cid, likes }).then(() => res.status(202).end());
+    }
+  } else {
+    // CREATE DOC
+    likes = {
+      value: 0,
+      wallets: [],
+    };
   }
+
+  // UPDATE CHANGES IN DOC
+  docstore.put({ _id: cid, likes }).then(() => res.status(202).end());
 });
 
-app.get("/api/v1/nft/metadata/:cid", (req, res) => {
+app.get("/api/v1/nft/metadata/:cid", authenticateToken, (req, res) => {
   const cid = req.params.cid;
-
   axios
     .get(`https://${cid}.ipfs.nftstorage.link/metadata.json`)
     .then((response) => {
@@ -102,7 +139,7 @@ app.get("/api/v1/nft/metadata/:cid", (req, res) => {
     });
 });
 
-app.post("/api/v1/image/converter", async (req, res) => {
+app.post("/api/v1/converter/image", authenticateToken, async (req, res) => {
   const form = formidable();
   form.parse(req, (err, fields, files) => {
     if (err) {
