@@ -79,7 +79,7 @@ const createInstance = async () => {
 
 createInstance();
 
-app.get("/api/v1/nft/create", (req, res) => {
+app.get("/api/v1/nft/create", authenticateToken, (req, res) => {
   // REQUEST QUERIES
   const cid = req.query.cid;
   const wallet = [req.query.wallet.toLowerCase()];
