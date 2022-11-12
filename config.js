@@ -6,13 +6,13 @@ export const config = {
     relay: { enabled: true },
     hop: { enabled: true, active: true },
     EXPERIMENTAL: { pubsub: true },
-    repo: "ok" + Math.random(),
+    repo: "./nfts/data",
     config: {
       Addresses: {
         Swarm: [
-          "/dns4/wrtc-star1.par.dwebops.pub/tcp/443/wss/p2p-webrtc-star/",
-          "/dns4/wrtc-star2.sjc.dwebops.pub/tcp/443/wss/p2p-webrtc-star/",
-          "/dns4/webrtc-star.discovery.libp2p.io/tcp/443/wss/p2p-webrtc-star/",
+          "/dns4/gridbotapi-production.up.railway.app/tcp/4002/p2p/Qmdw7Bkmx9GveLcNtReuTAqpZ3qQMdrXFZMKFeivDpbfbL",
+          "/dns4/gridbotapi-production.up.railway.app/tcp/4002/p2p/Qmdw7Bkmx9GveLcNtReuTAqpZ3qQMdrXFZMKFeivDpbfbL",
+          "/dns4/gridbotapi-production.up.railway.app/tcp/4003/ws/p2p/Qmdw7Bkmx9GveLcNtReuTAqpZ3qQMdrXFZMKFeivDpbfbL",
         ],
       },
     },

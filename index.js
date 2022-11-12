@@ -8,6 +8,7 @@ import OrbitDB from "orbit-db";
 import cors from "cors";
 import { createVerifier } from "fast-jwt";
 import Web3 from "web3";
+import { config } from "./config.js";
 
 dotenv.config({ silent: process.env.NODE_ENV === "production" });
 const app = express();
@@ -55,15 +56,20 @@ function authenticateToken(req, res, next) {
 let docstore;
 
 const createInstance = async () => {
+  const ipfsConfig = {
+    repo: "./nfts",
+    start: false,
+    EXPERIMENTAL: {
+      pubsub: true,
+    },
+  };
+
   try {
-    const ipfs = await create({
-      repo: "./nfts/data",
-      start: true,
-      EXPERIMENTAL: {
-        pubsub: true,
-      },
+    const ipfs = await create(ipfsConfig);
+    const orbitdb = await OrbitDB.createInstance(ipfs, {
+      offline: true,
+      id: "test-local-node",
     });
-    const orbitdb = await OrbitDB.createInstance(ipfs);
     docstore = await orbitdb.docstore("nfts");
     docstore.load();
   } catch (err) {
@@ -73,10 +79,10 @@ const createInstance = async () => {
 
 createInstance();
 
-app.get("/api/v1/nft/create", authenticateToken, (req, res) => {
+app.get("/api/v1/nft/create", (req, res) => {
   // REQUEST QUERIES
   const cid = req.query.cid;
-  const wallet = [req.query.wallet];
+  const wallet = [req.query.wallet.toLowerCase()];
 
   if (!docstore || wallet[0] === null || cid === null)
     return res.status(400).end();
@@ -162,7 +168,10 @@ app.post("/api/v1/converter/image", authenticateToken, async (req, res) => {
           extension: "avif",
         });
       })
-      .catch((err) => console.log(err));
+      .catch((err) => {
+        console.log(err);
+        process.exit(1);
+      });
   });
 });
 
