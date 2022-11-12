@@ -1,5 +1,6 @@
 import dotenv from "dotenv";
 import express from "express";
+import bodyParser from "body-parser";
 import sharp from "sharp";
 import formidable from "formidable";
 import axios from "axios";
@@ -8,12 +9,14 @@ import OrbitDB from "orbit-db";
 import cors from "cors";
 import { createVerifier } from "fast-jwt";
 import Web3 from "web3";
-import { config } from "./config.js";
+// import { config } from "./config.js";
 
 dotenv.config({ silent: process.env.NODE_ENV === "production" });
 const app = express();
 
 app.use(cors());
+
+const jsonParser = bodyParser.json();
 
 const web3 = new Web3(
   new Web3.providers.WebsocketProvider(process.env.QUICKNODE_RPC)
@@ -79,10 +82,9 @@ const createInstance = async () => {
 
 createInstance();
 
-app.get("/api/v1/nft/create", authenticateToken, (req, res) => {
-  // REQUEST QUERIES
-  const cid = req.query.cid;
-  const wallet = [req.query.wallet.toLowerCase()];
+app.put("/api/v1/nft/create", authenticateToken, jsonParser, (req, res) => {
+  // REQUEST BODY
+  const { cid, wallet } = req.body;
 
   if (!docstore || wallet[0] === null || cid === null)
     return res.status(400).end();
