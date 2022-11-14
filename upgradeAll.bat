@@ -1,1 +1,0 @@
-ncu -u && npm i
