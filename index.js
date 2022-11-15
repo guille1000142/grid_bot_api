@@ -9,6 +9,7 @@ import OrbitDB from "orbit-db";
 import cors from "cors";
 import { createVerifier } from "fast-jwt";
 import Web3 from "web3";
+import { NFTStorage, Blob } from "nft.storage";
 
 // ENVIROMENTS VARIABLES
 dotenv.config({ silent: process.env.NODE_ENV === "production" });
@@ -20,7 +21,12 @@ const app = express();
 app.use(cors());
 
 // BODY PARSER
-const jsonParser = bodyParser.json();
+const jsonParser = bodyParser.json({ limit: "50mb" });
+
+// NFT.STORAGE
+const client = new NFTStorage({
+  token: process.env.NFT_STORAGE_KEY,
+});
 
 // WSS QUICKNODE PROVIDER
 const web3 = new Web3(
@@ -47,7 +53,7 @@ function authenticateToken(req, res, next) {
   // VERIFY JWT
   return verify(token)
     .then((value) => {
-      if (wallet === undefined) {
+      if (wallet === undefined || wallet === null) {
         return next();
       } else {
         // VERIFY WALLET SIGNATURE
@@ -58,7 +64,7 @@ function authenticateToken(req, res, next) {
         );
 
         // VERIFY IF WALLET IS THE OWNER
-        if (wallet !== walletSignature.toLocaleLowerCase()) {
+        if (wallet.toLowerCase() !== walletSignature.toLowerCase()) {
           // FORBIDDEN
           return res.sendStatus(403);
         } else {
@@ -120,56 +126,117 @@ const createInstance = async () => {
 // CREATE IPFS AND ORBIT-DB INSTANCES
 createInstance();
 
-// CREATE OR UPDATE ORBIT-DB DOCUMENT
-app.put("/api/v1/nft/create", authenticateToken, jsonParser, (req, res) => {
-  // REQUEST BODY
+const b64toBlob = ({ base64Data, contentType, sliceSize = 256 }) => {
+  const byteCharacters = atob(base64Data);
+  const byteArrays = [];
 
-  const wallet = [req.query.wallet];
-  const { cid } = req.body;
+  for (let offset = 0; offset < byteCharacters.length; offset += sliceSize) {
+    const slice = byteCharacters.slice(offset, offset + sliceSize);
 
-  if (!docstore || wallet[0] === null || cid === null)
-    return res.status(400).end();
-
-  let likes;
-
-  // CHECK IF DOC EXISTS
-  const info = docstore.get(cid)[0];
-
-  if (info.length > 0) {
-    const { value, wallets } = info.likes;
-    // UPDATE CHANGES
-
-    // CHECK IF WALLET HAS GIVEN A LIKE
-    const isWallet = wallets.find((user) => user === wallet[0]);
-    if (isWallet !== undefined) {
-      // REMOVE LIKE
-      const index = wallets.indexOf(wallet[0]);
-      wallets.splice(index, 1);
-      likes = {
-        value: value - 1,
-        wallets: wallets,
-      };
-    } else {
-      // ADD LIKE
-      likes = {
-        value: value + 1,
-        wallets: wallets.concat(wallet),
-      };
-      docstore.put({ _id: cid, likes }).then(() => res.status(202).end());
+    const byteNumbers = new Array(slice.length);
+    for (let i = 0; i < slice.length; i++) {
+      byteNumbers[i] = slice.charCodeAt(i);
     }
-  } else {
-    // NEW DOC
-    likes = {
-      value: 0,
-      wallets: [],
-    };
+
+    const byteArray = new Uint8Array(byteNumbers);
+    byteArrays.push(byteArray);
   }
 
-  // CREATE OR UPDATE DOC TO ORBIT-DB
-  docstore.put({ _id: cid, likes }).then(() => res.status(202).end());
+  return new Blob(byteArrays, { type: contentType });
+};
+
+// RESIZE IMAGE AND UPLOAD NFT METADATA TO NFT.STORAGE
+app.post("/api/v1/nft/upload", authenticateToken, async (req, res) => {
+  const form = formidable();
+  form.parse(req, (err, fields, files) => {
+    if (err) {
+      console.log(err);
+      res.status(400).end();
+    }
+
+    const { width, height, name, description } = JSON.parse(fields.data);
+    const originalImage = files.image.filepath;
+
+    sharp(originalImage)
+      .resize(width, height)
+      .avif()
+      .toBuffer()
+      .then((result) => {
+        const format = "base64";
+        const base64Data = result.toString(format);
+        const contentType = "image/avif";
+        const image = b64toBlob({ base64Data, contentType });
+        client
+          .store({
+            name,
+            description,
+            image,
+          })
+          .then((uri) => res.status(200).json(uri))
+          .catch((err) => {
+            console.log(err);
+            res.status(400).end();
+          });
+      })
+      .catch((err) => {
+        console.log(err);
+        res.status(400).end();
+      });
+  });
 });
 
-// RETURN NFT METADATA
+// CREATE OR UPDATE ORBIT-DB DOCUMENT
+app.put(
+  "/api/v1/nft/create",
+  authenticateToken,
+  jsonParser,
+  async (req, res) => {
+    const wallet = req.query.wallet;
+    const { cid } = req.body;
+
+    if (!docstore || wallet === null || cid === null)
+      return res.status(400).end();
+
+    let likes;
+    // CHECK IF DOC EXISTS
+    const info = docstore.get(cid);
+
+    if (info.length > 0) {
+      const { value, wallets } = info[0].likes;
+      // UPDATE CHANGES
+
+      // CHECK IF WALLET HAS GIVEN A LIKE
+      const isWallet = wallets.find((user) => user === wallet);
+      if (isWallet !== undefined) {
+        // REMOVE LIKE
+        const index = wallets.indexOf(wallet);
+        wallets.splice(index, 1);
+        likes = {
+          value: value - 1,
+          wallets: wallets,
+        };
+      } else {
+        // ADD LIKE
+        likes = {
+          value: value + 1,
+          wallets: wallets.concat([wallet]),
+        };
+      }
+    } else {
+      // NEW DOC
+      likes = {
+        value: 0,
+        wallets: [],
+      };
+    }
+
+    if (likes !== undefined)
+      docstore.put({ _id: cid, likes }).then(() => res.status(200).end());
+    // CREATE OR UPDATE DOC TO ORBIT-DB
+  }
+);
+
+// RETRIEVE SPECIFIED CID FROM IPFS
 app.get("/api/v1/nft/metadata/:cid", authenticateToken, (req, res) => {
   const cid = req.params.cid;
   axios
@@ -189,35 +256,42 @@ app.get("/api/v1/nft/metadata/:cid", authenticateToken, (req, res) => {
     });
 });
 
-// RESIZE IMAGE TO .AVIF BEFORE UPLOADING IMAGE TO NFT.STORAGE
-app.post("/api/v1/converter/image", authenticateToken, async (req, res) => {
-  const form = formidable();
-  form.parse(req, (err, fields, files) => {
-    if (err) {
-      console.log(err);
-      return;
-    }
+// RETRIEVE ALL CIDS FROM NFT.STORAGE API
+app.get("/api/v1/nft/storage", authenticateToken, (req, res) => {
+  const date = encodeURI(new Date().toISOString());
+  const limit = 1000;
 
-    const { width, height } = JSON.parse(fields.dimensions);
-    const imageInput = files.image.filepath;
+  axios
+    .get(`https://api.nft.storage/?before=${date}&limit=${limit}`, {
+      headers: {
+        Authorization: `Bearer ${process.env.NFT_STORAGE_KEY}`,
+        "Content-Type": "application/json",
+      },
+    })
+    .then((cids) => {
+      res.status(200).json(cids.data);
+    })
+    .catch((err) => {
+      res.status(400).end();
+    });
+});
 
-    sharp(imageInput)
-      .resize(width, height)
-      .avif()
-      .toBuffer()
-      .then((data) => {
-        const base64Data = data.toString("base64");
-        res.status(202).json({
-          b64Data: base64Data,
-          contentType: "image/avif",
-          extension: "avif",
-        });
-      })
-      .catch((err) => {
-        console.log(err);
-        process.exit(1);
-      });
-  });
+// RETRIEVE SPECIFIED CID FROM NFT.STORAGE API
+app.get("/api/v1/nft/storage/:cid", authenticateToken, (req, res) => {
+  const cid = req.params.cid;
+  axios
+    .get(`https://api.nft.storage/${cid}`, {
+      headers: {
+        Authorization: `Bearer ${process.env.NFT_STORAGE_KEY}`,
+        "Content-Type": "application/json",
+      },
+    })
+    .then((cid) => {
+      res.status(200).json(cid.data.value);
+    })
+    .catch((err) => {
+      res.status(400).end();
+    });
 });
 
 const PORT = process.env.PORT;
