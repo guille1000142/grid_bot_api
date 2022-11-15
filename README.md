@@ -109,6 +109,7 @@ This configuration allow run instances in local node for tests
 - Enter enviroments variables in `.env`
   ```
   NODE_PORT=
+  CORS_ORIGIN=
   QUICKNODE_RPC=
   TOKEN_SECRET=
   NFT_STORAGE_KEY

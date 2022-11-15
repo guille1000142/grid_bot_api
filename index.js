@@ -18,7 +18,11 @@ dotenv.config({ silent: process.env.NODE_ENV === "production" });
 const app = express();
 
 // CORS
-app.use(cors());
+app.use(
+  cors({
+    origin: process.env.CORS_ORIGIN,
+  })
+);
 
 // BODY PARSER
 const jsonParser = bodyParser.json({ limit: "50mb" });
