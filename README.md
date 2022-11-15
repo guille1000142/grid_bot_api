@@ -65,7 +65,7 @@
     git clone https://github.com/your_username_/Project-Name.git
    ```
 
-2. change directory
+2. Change directory
 
    ```sh
     cd grid_bot_api
@@ -218,7 +218,7 @@ Ex. Modify NFT likes in a orbitDB document.
   });
   ```
 
-  - Retrieve stored file CID from NFT.STORAGE API
+- Retrieve stored file CID from NFT.STORAGE API
 
   ```js
   const cid = "NFT_STORAGE_IPFS_CID";
@@ -232,7 +232,7 @@ Ex. Modify NFT likes in a orbitDB document.
   });
   ```
 
-  - Retrieve all stored files from NFT.STORAGE API
+- Retrieve all stored files from NFT.STORAGE API
 
   ```js
   fetch(`http://localhost:5000/api/v1/nft/storage`, {
