@@ -12,9 +12,8 @@
   </p>
 </div>
 
-
-
 <!-- TABLE OF CONTENTS -->
+
 ## Table of contents
 
 <details>
@@ -46,23 +45,22 @@
   </ol>
 </details>
 
-
-
 <!-- GETTING STARTED -->
+
 ## Getting Started
 
 ### Prerequisites
 
-* npm
+- npm
   ```sh
   npm install npm@latest -g
   ```
-  
-* node.js version 16.16.0
- 
+- node.js version 16.16.0
+
 ### Installation
 
 1. Clone the repository
+
    ```sh
     git clone https://github.com/your_username_/Project-Name.git
    ```
@@ -73,12 +71,15 @@
    ```
 
 <!-- CONFIG -->
+
 ## Configuration
 
 ### Instances
+
 This configuration allow run instances in local node for tests
 
-* IPFS
+- IPFS
+
   ```js
   const ipfsConfig = {
     repo: "./nfts",
@@ -86,27 +87,29 @@ This configuration allow run instances in local node for tests
     EXPERIMENTAL: {
       pubsub: true,
     },
-  }
+  };
   ```
 
-* Orbit-DB
+- Orbit-DB
   ```js
   const orbitDbConfig = {
     offline: true,
     id: "test-local-node",
-  }
+  };
   ```
 
 ### Enviroments variables
 
-* Enter enviroments variables in `.env`
-   ```
-   NODE_PORT=
-   QUICKNODE_RPC=
-   JWT_TOKEN_SECRET=
-   ```  
+- Enter enviroments variables in `.env`
+  ```
+  NODE_PORT=
+  QUICKNODE_RPC=
+  TOKEN_SECRET=
+  NFT_STORAGE_KEY
+  ```
 
 <!-- SETUP -->
+
 ## Setup
 
 1. Run node
@@ -114,34 +117,38 @@ This configuration allow run instances in local node for tests
    npm run start
    ```
 
-
-
 <!-- USAGE -->
+
 ## API usage
 
 ### API Authorization
 
-This is required to check that the wallet trying to request something is actually the owner of the wallet. 
+This is required to check that the wallet trying to request something is actually the owner of the wallet.
 Ex. Modify NFT likes in a orbitDB document.
 
+- Install
 
-* Install
   ```sh
   npm install fast-jwt web3
   ```
 
-* Import
+- Import
+
   ```js
-  import web3 from 'web3'
-  import { createSigner } from 'fast-jwt';
+  import web3 from "web3";
+  import { createSigner } from "fast-jwt";
   ```
 
-* Sign message with metamask wallet
+- Sign message with metamask wallet
+
   ```js
-  const signature = await web3.metamask.eth.personal.sign("ENTER_MESSAGE_TO_SIGN", "ENTER_SIGNER_ADDRESS")
+  const signature = await web3.metamask.eth.personal.sign(
+    "ENTER_MESSAGE_TO_SIGN",
+    "ENTER_SIGNER_ADDRESS"
+  );
   ```
 
-* Create JWT with wallet signature
+- Create JWT with wallet signature
   ```js
   const sign = createSigner({ key: 'ENTER_PRIVATE_KEY' });
   const jwt = sign({ signature: 'ENTER_WALLET_SIGNATURE });
@@ -149,62 +156,97 @@ Ex. Modify NFT likes in a orbitDB document.
 
 ### API requests
 
-* Resize images to .avif before uploading image to NFT.Storage
+- Resize image and upload NFT metadata to NFT.STORAGE
+
   ```js
+  const file = "IMAGE FILE OBJECT";
+  const data = {
+    width: "NEW IMAGE WIDTH",
+    height: "NEW IMAGE HEIGHT",
+    name: "NFT NAME",
+    description: "NFT DESCRIPTION",
+  };
+
   const formData = new FormData();
   formData.append("image", file, file.name);
-  formData.append("dimensions", dimensions);
+  formData.append("data", data);
 
-  fetch('http://localhost:5000/api/v1/converter/image', {
+  fetch("http://localhost:5000/api/v1/upload", {
     method: "POST",
     headers: {
-     Authorization: `Bearer ${jwt}`,
+      Authorization: `Bearer ${jwt}`,
     },
     body: formData,
-  })
+  });
   ```
 
-* Create new Orbit-DB document and store NFT likes
+- Create new Orbit-DB document and store NFT likes
+
   ```js
-  const wallet = 'METAMASK_WALLET'
-  const cid = 'NFT_STORAGE_IPFS_CID'
+  const wallet = "METAMASK_WALLET";
+  const cid = "NFT_STORAGE_IPFS_CID";
 
   fetch(`http://localhost:5000/api/v1/nft/create?wallet=${wallet}`, {
     method: "PUT",
     headers: {
-     Authorization: `Bearer ${jwt}`,
-     "Content-Type": "application/json",
+      Authorization: `Bearer ${jwt}`,
+      "Content-Type": "application/json",
     },
     body: JSON.stringify({
-     cid: cid,
-    })
-  })
+      cid: cid,
+    }),
+  });
   ```
 
-* Fetch and return NFT metadata.json from IPFS and NFT document from Orbit-DB.
+- Retrieve file CID from NFT.STORAGE and document from Orbit-DB.
+
   ```js
-  const cid = 'NFT_STORAGE_IPFS_CID'
+  const cid = "NFT_STORAGE_IPFS_CID";
 
   fetch(`http://localhost:5000/api/v1/nft/metadata/${cid}`, {
     method: "GET",
     headers: {
-     Authorization: `Bearer ${jwt}`,
-     "Content-Type": "application/json",
+      Authorization: `Bearer ${jwt}`,
+      "Content-Type": "application/json",
     },
-  })
+  });
   ```
 
+  - Retrieve stored file CID from NFT.STORAGE API
 
+  ```js
+  const cid = "NFT_STORAGE_IPFS_CID";
+
+  fetch(`http://localhost:5000/api/v1/nft/storage/${cid}`, {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${jwt}`,
+      "Content-Type": "application/json",
+    },
+  });
+  ```
+
+  - Retrieve all stored files from NFT.STORAGE API
+
+  ```js
+  fetch(`http://localhost:5000/api/v1/nft/storage`, {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${jwt}`,
+      "Content-Type": "application/json",
+    },
+  });
+  ```
 
 <!-- LICENSE -->
+
 ## License
 
 Distributed under the MIT License. See `LICENSE.txt` for more information.
 
-
-
 <!-- CONTACT -->
+
 ## Contact
 
-* Leandro Labiano - Blockchain Developer - [@your_twitter](https://twitter.com/your_username) - email@example.com
-* Guillermo Izquierdo - Full Stack Developer - [@S7Joms](https://twitter.com/S7Joms) - guille1000142@gmail.com
+- Leandro Labiano - Blockchain Developer - [@your_twitter](https://twitter.com/your_username) - email@example.com
+- Guillermo Izquierdo - Full Stack Developer - [@S7Joms](https://twitter.com/S7Joms) - guille1000142@gmail.com
