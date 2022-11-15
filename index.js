@@ -6,6 +6,7 @@ import formidable from "formidable";
 import axios from "axios";
 import { create } from "ipfs";
 import OrbitDB from "orbit-db";
+import cors from "cors";
 import { createVerifier } from "fast-jwt";
 import Web3 from "web3";
 import { NFTStorage, Blob } from "nft.storage";
@@ -15,6 +16,13 @@ dotenv.config({ silent: process.env.NODE_ENV === "production" });
 
 // EXPRESS
 const app = express();
+
+// CORS
+app.use(
+  cors({
+    origin: process.env.CORS_ORIGIN,
+  })
+);
 
 // BODY PARSER
 const jsonParser = bodyParser.json({ limit: "50mb" });
